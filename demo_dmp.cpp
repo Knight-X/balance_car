@@ -64,13 +64,14 @@ VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measure
 VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float yprt[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+int16_t data[3];
 struct ypr {
     float roll;
     float pitch;
-    int32_t gyrox;
-    int32_t gyroy;
+    float gyrox;
+    float gyroy;
 };
-SensorQueue<ypr> buff(160, 32, 2);
+SensorQueue<ypr> buff(100, 10, 2);
 // packet structure for InvenSense teapot demo
 uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
 
@@ -157,13 +158,12 @@ void loop() {
             mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
-            int32_t data[3] = {0}; 
             mpu.dmpGetGyro(data, fifoBuffer);
             ypr x;
             x.pitch = yprt[1];
             x.roll = yprt[2];
-            x.gyrox = data[0];
-            x.gyroy = data[1];
+            x.gyrox = (float)data[0] / 16384.0f;
+            x.gyroy = (float)data[1] / 16384.0f;
             buff.append(x);
         #endif
 
@@ -208,7 +208,7 @@ void dosomething() {
     ypr* tmp = (ypr*) malloc(sizeof(ypr) * 160);
     pc.printf("before copy....\r\n");
     buff.copyTo(tmp);
-    pc.printf("rp  %7.2f %7.2f %7.2f %7.2f \t\n", tmp[0].roll * 180/M_PI, tmp[0].pitch * 180/M_PI, tmp[0].gyrox * M_PI/180, tmp[0].gyroy * M_PI/180);
+    pc.printf("rp  %7.4f %7.4f %7.2f %7.2f \t\n", tmp[0].roll, tmp[0].pitch, tmp[0].gyrox * 200, tmp[0].gyroy * 200);
     free(tmp);
 
     
