@@ -65,8 +65,10 @@ VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float yprt[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 struct ypr {
-    float pitch;
     float roll;
+    float pitch;
+    int32_t gyrox;
+    int32_t gyroy;
 };
 SensorQueue<ypr> buff(160, 32, 2);
 // packet structure for InvenSense teapot demo
@@ -155,9 +157,13 @@ void loop() {
             mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
+            int32_t data[3] = {0}; 
+            mpu.dmpGetGyro(data, fifoBuffer);
             ypr x;
             x.pitch = yprt[1];
             x.roll = yprt[2];
+            x.gyrox = data[0];
+            x.gyroy = data[1];
             buff.append(x);
         #endif
 
@@ -202,7 +208,7 @@ void dosomething() {
     ypr* tmp = (ypr*) malloc(sizeof(ypr) * 160);
     pc.printf("before copy....\r\n");
     buff.copyTo(tmp);
-    pc.printf("pr  %7.2f %7.2f \t\n", tmp[0].pitch * 180/M_PI, tmp[0].roll * 180/M_PI);
+    pc.printf("rp  %7.2f %7.2f %7.2f %7.2f \t\n", tmp[0].roll * 180/M_PI, tmp[0].pitch * 180/M_PI, tmp[0].gyrox * M_PI/180, tmp[0].gyroy * M_PI/180);
     free(tmp);
 
     
