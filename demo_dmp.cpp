@@ -56,6 +56,7 @@ uint8_t devStatus;      // return status after each device operation (0 = succes
 uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
+const float maxspeed = 5.0;     // kHz
 
 Serial pc(USBTX, USBRX, 115200);
 // orientation/motion vars
@@ -66,11 +67,12 @@ VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measure
 VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float yprt[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+int16_t data[3];
 struct ypr {
     float roll;
     float pitch;
-    int32_t gyrox;
-    int32_t gyroy;
+    float gyrox;
+    float gyroy;
 };
 #define MOTOR_EN_PIN        PF_12   // D8
 #define MOTOR_SPD_R_PIN     PD_14   // D10
@@ -89,7 +91,7 @@ DigitalOut MOTOR_DIR_R(MOROR_DIR_R_PIN);
 DigitalOut MOTOR_DIR_L(MOROR_DIR_L_PIN);
 PwmOut MOTOR_SPD_R(MOTOR_SPD_R_PIN);
 PwmOut MOTOR_SPD_L(MOTOR_SPD_L_PIN);
-SensorQueue<ypr> buff(160, 32, 2);
+SensorQueue<ypr> buff(2, 1, 2);
 // packet structure for InvenSense teapot demo
 uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
 
@@ -98,6 +100,24 @@ uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\
 // ===                      INITIAL SETUP                       ===
 // ================================================================
 
+void motorInit()
+{
+    //FREQ_CHECK.period_us(1.0/maxspeed*1000.0);  // Set Frequency
+    MOTOR_SPD_R.period_us(1.0/maxspeed*1000.0);
+    MOTOR_SPD_L.period_us(1.0/maxspeed*1000.0);
+
+    //FREQ_CHECK = 0.5;           // Set PWM Duty Cycle 50%
+    MOTOR_SPD_R = 0.5;          
+    MOTOR_SPD_L = 0.5;
+
+    MOTOR_DIR_R = MOTOR_CW;     // CW: true, CCW: false
+    MOTOR_DIR_L = MOTOR_CW;
+}
+
+void init() {
+    motorInit();
+    MOTOR_En = true;
+}
 void setup() {
     // initialize device
     pc.printf("Initializing I2C devices...\n");
@@ -176,13 +196,12 @@ void loop() {
             mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
-            int32_t data[3] = {0}; 
             mpu.dmpGetGyro(data, fifoBuffer);
             ypr x;
             x.pitch = yprt[1];
             x.roll = yprt[2];
-            x.gyrox = data[0];
-            x.gyroy = data[1];
+            x.gyrox = (float)data[0] / 16384.0f;
+            x.gyroy = (float)data[1] / 16384.0f;
             buff.append(x);
         #endif
 
@@ -282,15 +301,15 @@ void setMotors(float LSpd)
 
 void dosomething() {
     pc.printf("start....\r\n");
-    ypr* tmp = (ypr*) malloc(sizeof(ypr) * 160);
+    ypr* tmp = (ypr*) malloc(sizeof(ypr) * 2);
     pc.printf("before copy....\r\n");
     buff.copyTo(tmp);
-    pc.printf("rp  %7.2f %7.2f %7.2f %7.2f \t\n", tmp[0].roll * 180/M_PI, tmp[0].pitch * 180/M_PI, tmp[0].gyrox * M_PI/180, tmp[0].gyroy * M_PI/180);
+    pc.printf("rp  %7.4f %7.4f %7.2f %7.2f \t\n", tmp[0].roll, tmp[0].pitch, tmp[0].gyrox * 200, tmp[0].gyroy * 200);
     float sensorRaw[4] = {0};
-    sensorRaw[0] = tmp[0].pitch;
-    sensorRaw[1] = tmp[0].roll;
-    sensorRaw[2] = 0.5;
-    sensorRaw[3] = 0.3; 
+    sensorRaw[0] = tmp[0].roll;
+    sensorRaw[1] = tmp[0].pitch;
+    sensorRaw[2] = tmp[0].gyrox * 200;
+    sensorRaw[3] = tmp[0].gyroy * 200; 
     float nnCmd = nn(sensorRaw);
     setMotors(nnCmd);
     free(tmp);
@@ -299,6 +318,7 @@ void dosomething() {
 }
 int main() {
     setup();
+    init();
     wait_ms(1000);
     buff.setCallBack(dosomething);
     for (;;) {
