@@ -5,6 +5,8 @@
 #define M_PI 3.14
 #include "mbed.h"
 #include "SensorQueue.hpp"
+#include "ppo-test.hpp"
+
 
 // class default I2C address is 0x68
 // specific I2C addresses may be passed as a parameter here
@@ -68,6 +70,23 @@ struct ypr {
     float pitch;
     float roll;
 };
+#define MOTOR_EN_PIN        PF_12   // D8
+#define MOTOR_SPD_R_PIN     PD_14   // D10
+#define MOTOR_SPD_L_PIN     PD_15   // D9
+#define MOROR_DIR_R_PIN     PF_13   // D7
+#define MOROR_DIR_L_PIN     PE_9    // D6
+//#define FREQ_CHECK_PIN      PE_11   // D5
+
+#define MOTOR_CW            false
+#define MOTOR_CCW           true
+bool prev_dir = false;
+bool curr_dir = false;
+
+DigitalOut MOTOR_En(MOTOR_EN_PIN);
+DigitalOut MOTOR_DIR_R(MOROR_DIR_R_PIN);
+DigitalOut MOTOR_DIR_L(MOROR_DIR_L_PIN);
+PwmOut MOTOR_SPD_R(MOTOR_SPD_R_PIN);
+PwmOut MOTOR_SPD_L(MOTOR_SPD_L_PIN);
 SensorQueue<ypr> buff(160, 32, 2);
 // packet structure for InvenSense teapot demo
 uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
@@ -197,12 +216,77 @@ void loop() {
     }
 }
 
+void setMotors(float LSpd)
+{
+    // Need set period first then set pwm, it's a trap !!!
+    LSpd = LSpd * 4500;
+    //RSpd = RSpd * 3200.0;
+    unsigned int TmpL = abs((int)(1.0 / LSpd));   
+    //int TmpR = abs((int)(1.0 / RSpd));    
+    // SpdL_print = TmpL;
+/*    if (TmpL > -400 && TmpL < 0) {
+        TmpL = -400;
+    } else if (TmpL < 400 && TmpL >= 0) {
+        TmpL = 400;
+    } else if (TmpL >= 3125) {
+        TmpL = 3125;
+    } else if (TmpL <= -3125) {
+        TmpL = -3125;
+    }*/
+    TmpL = 1000000 * TmpL;
+     if (TmpL < 223 && TmpL >= 0) {
+        TmpL = 223;
+    } else if (TmpL >= 37650) {
+        TmpL = 37650;
+    } 
+    /*if (TmpR > -400 && TmpR < 0) {
+        TmpR = -400;
+    } else if (TmpR < 400 && TmpR >= 0) {
+        TmpR = 400;
+    } else if (TmpR >= 3125) {
+        TmpR = 3125;
+    } else if (TmpR <= -3125) {
+        TmpR = -3125;
+    }*/
+    //FREQ_CHECK.period_us(TmpL);
+    MOTOR_SPD_L.period_us(TmpL);
+    MOTOR_SPD_R.period_us(TmpL);
+
+    //FREQ_CHECK = 0.5;               // Set PWM Duty Cycle 50%
+    MOTOR_SPD_R = 0.5;          
+    MOTOR_SPD_L = 0.5;
+
+    if (LSpd >= 0.0) {
+        curr_dir = true;
+    } else {
+        curr_dir = false;
+    }
+
+    if (curr_dir != prev_dir) {
+    if(LSpd >= 0.0)  {    MOTOR_DIR_L = MOTOR_CW;  
+                          MOTOR_DIR_R = MOTOR_CW;
+                          prev_dir = true;
+    } else {
+                   MOTOR_DIR_L = MOTOR_CCW;  
+                   MOTOR_DIR_R = MOTOR_CCW;  
+                   prev_dir = false;
+    }
+    }
+}
+
 void dosomething() {
     pc.printf("start....\r\n");
     ypr* tmp = (ypr*) malloc(sizeof(ypr) * 160);
     pc.printf("before copy....\r\n");
     buff.copyTo(tmp);
     pc.printf("pr  %7.2f %7.2f \t\n", tmp[0].pitch * 180/M_PI, tmp[0].roll * 180/M_PI);
+    float sensorRaw[4] = {0};
+    sensorRaw[0] = tmp[0].pitch;
+    sensorRaw[1] = tmp[0].roll;
+    sensorRaw[2] = 0.5;
+    sensorRaw[3] = 0.3; 
+    float nnCmd = nn(sensorRaw);
+    setMotors(nnCmd);
     free(tmp);
 
     
