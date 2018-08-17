@@ -4,7 +4,7 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #define M_PI 3.14
 #include "mbed.h"
-#include "SensorQueue.hpp"
+//#include "SensorQueue.hpp"
 #include "ppo-test.hpp"
 
 
@@ -58,6 +58,9 @@ uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 const float maxspeed = 5.0;     // kHz
 
+InterruptIn sw(PE_15);
+EventQueue queue(32 * EVENTS_EVENT_SIZE);
+Thread t;
 Serial pc(USBTX, USBRX, 115200);
 // orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
@@ -74,6 +77,7 @@ struct ypr {
     float gyrox;
     float gyroy;
 };
+ypr x_d;
 #define MOTOR_EN_PIN        PF_12   // D8
 #define MOTOR_SPD_R_PIN     PD_14   // D10
 #define MOTOR_SPD_L_PIN     PD_15   // D9
@@ -91,7 +95,7 @@ DigitalOut MOTOR_DIR_R(MOROR_DIR_R_PIN);
 DigitalOut MOTOR_DIR_L(MOROR_DIR_L_PIN);
 PwmOut MOTOR_SPD_R(MOTOR_SPD_R_PIN);
 PwmOut MOTOR_SPD_L(MOTOR_SPD_L_PIN);
-SensorQueue<ypr> buff(2, 1, 2);
+//SensorQueue<ypr> buff(2, 1, 2);
 // packet structure for InvenSense teapot demo
 uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
 
@@ -197,12 +201,11 @@ void loop() {
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
             mpu.dmpGetGyro(data, fifoBuffer);
-            ypr x;
-            x.pitch = yprt[1];
-            x.roll = yprt[2];
-            x.gyrox = (float)data[0] / 16384.0f;
-            x.gyroy = (float)data[1] / 16384.0f;
-            buff.append(x);
+            x_d.pitch = yprt[1];
+            x_d.roll = yprt[2];
+            x_d.gyrox = (float)data[0] / 16384.0f;
+            x_d.gyroy = (float)data[1] / 16384.0f;
+            //buff.append(x);
         #endif
 
         #ifdef OUTPUT_READABLE_REALACCEL
@@ -300,19 +303,19 @@ void setMotors(float LSpd)
 }
 
 void dosomething() {
-    pc.printf("start....\r\n");
-    ypr* tmp = (ypr*) malloc(sizeof(ypr) * 2);
-    pc.printf("before copy....\r\n");
-    buff.copyTo(tmp);
-    pc.printf("rp  %7.4f %7.4f %7.2f %7.2f \t\n", tmp[0].roll, tmp[0].pitch, tmp[0].gyrox * 200, tmp[0].gyroy * 200);
+    //pc.printf("start....\r\n");
+    //ypr* tmp = (ypr*) malloc(sizeof(ypr) * 2);
+    //pc.printf("before copy....\r\n");
+    //buff.copyTo(tmp);
+    //pc.printf("rp  %7.4f %7.4f %7.2f %7.2f \t\n", tmp[0].roll, tmp[0].pitch, tmp[0].gyrox * 200, tmp[0].gyroy * 200);
     float sensorRaw[4] = {0};
-    sensorRaw[0] = tmp[0].roll;
-    sensorRaw[1] = tmp[0].pitch;
-    sensorRaw[2] = tmp[0].gyrox * 200;
-    sensorRaw[3] = tmp[0].gyroy * 200; 
+    sensorRaw[0] = x_d.roll;
+    sensorRaw[1] = x_d.pitch;
+    sensorRaw[2] = x_d.gyrox * 200;
+    sensorRaw[3] = x_d.gyroy * 200; 
     float nnCmd = nn(sensorRaw);
     setMotors(nnCmd);
-    free(tmp);
+//    free(tmp);
 
     
 }
@@ -320,9 +323,15 @@ int main() {
     setup();
     init();
     wait_ms(1000);
-    buff.setCallBack(dosomething);
+//    buff.setCallBack(dosomething);
+    t.start(callback(&queue, &EventQueue::dispatch_forever));
+
+    sw.rise(loop);
+
+    sw.fall(queue.event(dosomething));
+            
     for (;;) {
-        loop();
+        //loop();
     }
 
     return 0;
