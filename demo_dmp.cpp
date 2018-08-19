@@ -4,7 +4,6 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #define M_PI 3.14
 #include "mbed.h"
-//#include "SensorQueue.hpp"
 #include "ppo-test.hpp"
 
 
@@ -30,7 +29,6 @@ MPU6050 mpu;
 // from the FIFO. Note this also requires gravity vector calculations.
 // Also note that yaw/pitch/roll angles suffer from gimbal lock (for
 // more info, see: http://en.wikipedia.org/wiki/Gimbal_lock)
-#define OUTPUT_READABLE_YAWPITCHROLL
 
 // uncomment "OUTPUT_READABLE_REALACCEL" if you want to see acceleration
 // components with gravity removed. This acceleration reference frame is
@@ -83,7 +81,6 @@ ypr x_d;
 #define MOTOR_SPD_L_PIN     PD_15   // D9
 #define MOROR_DIR_R_PIN     PF_13   // D7
 #define MOROR_DIR_L_PIN     PE_9    // D6
-//#define FREQ_CHECK_PIN      PE_11   // D5
 
 #define MOTOR_CW            false
 #define MOTOR_CCW           true
@@ -95,15 +92,40 @@ DigitalOut MOTOR_DIR_R(MOROR_DIR_R_PIN);
 DigitalOut MOTOR_DIR_L(MOROR_DIR_L_PIN);
 PwmOut MOTOR_SPD_R(MOTOR_SPD_R_PIN);
 PwmOut MOTOR_SPD_L(MOTOR_SPD_L_PIN);
-//SensorQueue<ypr> buff(2, 1, 2);
-// packet structure for InvenSense teapot demo
-uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
 
 
 // ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
 
+void setMotors(float LSpd)
+{
+    // Need set period first then set pwm, it's a trap !!!
+    LSpd = LSpd * 4500;
+    unsigned int TmpL = abs((int)(1.0 / LSpd));   
+    TmpL = 1000000 * TmpL;
+
+     if (TmpL < 223 && TmpL >= 0) {
+        TmpL = 223;
+    } else if (TmpL >= 37650) {
+        TmpL = 37650;
+    } 
+    //FREQ_CHECK.period_us(TmpL);
+    MOTOR_SPD_L.period_us(TmpL);
+    MOTOR_SPD_R.period_us(TmpL);
+
+    MOTOR_SPD_R = 0.5;          
+    MOTOR_SPD_L = 0.5;
+
+    if(LSpd >= 0.0)  {    MOTOR_DIR_L = MOTOR_CW;  
+                          MOTOR_DIR_R = MOTOR_CW;
+                          prev_dir = true;
+    } else {
+                   MOTOR_DIR_L = MOTOR_CCW;  
+                   MOTOR_DIR_R = MOTOR_CCW;  
+                   prev_dir = false;
+    }
+}
 void motorInit()
 {
     //FREQ_CHECK.period_us(1.0/maxspeed*1000.0);  // Set Frequency
@@ -166,6 +188,21 @@ void setup() {
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 
+void dosomething() {
+    float sensorRaw[4] = {0};
+    sensorRaw[0] = x_d.roll;
+    sensorRaw[1] = x_d.pitch;
+    sensorRaw[2] = x_d.gyrox * 250;
+    sensorRaw[3] = x_d.gyroy * 250; 
+    float nnCmd = nn(sensorRaw);
+    if (nnCmd > 0.3) {
+        nnCmd = 0.3f;
+    } else if (nnCmd < -0.3){
+        nnCmd = -0.3f;
+    }
+    setMotors(nnCmd);
+}
+
 void loop() {
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
@@ -175,27 +212,14 @@ void loop() {
     if (fifoCount == 1024) {
         // reset so we can continue cleanly
         mpu.resetFIFO();
-        pc.printf("FIFO overflow!\n");
+//        pc.printf("FIFO overflow!\n");
 
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
     } else if (fifoCount >= 42) {
         // read a packet from FIFO
         mpu.getFIFOBytes(fifoBuffer, packetSize);
         
-        #ifdef OUTPUT_READABLE_QUATERNION
-            // display quaternion values in easy matrix form: w x y z
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            pc.printf("quat %7.2f %7.2f %7.2f %7.2f    ", q.w,q.x,q.y,q.z);
-        #endif
 
-        #ifdef OUTPUT_READABLE_EULER
-            // display Euler angles in degrees
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetEuler(euler, &q);
-            pc.printf("euler %7.2f %7.2f %7.2f    ", euler[0] * 180/M_PI, euler[1] * 180/M_PI, euler[2] * 180/M_PI);
-        #endif
-
-        #ifdef OUTPUT_READABLE_YAWPITCHROLL
             // display Euler angles in degrees
             mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetGravity(&gravity, &q);
@@ -205,133 +229,29 @@ void loop() {
             x_d.roll = yprt[2];
             x_d.gyrox = (float)data[0] / 16384.0f;
             x_d.gyroy = (float)data[1] / 16384.0f;
+//            pc.printf("d %7.2f %7.2f %7.2f %7.2f   ", yprt[2], yprt[1], x_d.gyrox, x_d.gyroy);
+            dosomething();
             //buff.append(x);
-        #endif
-
-        #ifdef OUTPUT_READABLE_REALACCEL
-            // display real acceleration, adjusted to remove gravity
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetAccel(&aa, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-            pc.printf("areal %6d %6d %6d    ", aaReal.x, aaReal.y, aaReal.z);
-        #endif
-
-        #ifdef OUTPUT_READABLE_WORLDACCEL
-            // display initial world-frame acceleration, adjusted to remove gravity
-            // and rotated based on known orientation from quaternion
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetAccel(&aa, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
-            pc.printf("aworld %6d %6d %6d    ", aaWorld.x, aaWorld.y, aaWorld.z);
-        #endif
-    
-        #ifdef OUTPUT_TEAPOT
-            // display quaternion values in InvenSense Teapot demo format:
-            teapotPacket[2] = fifoBuffer[0];
-            teapotPacket[3] = fifoBuffer[1];
-            teapotPacket[4] = fifoBuffer[4];
-            teapotPacket[5] = fifoBuffer[5];
-            teapotPacket[6] = fifoBuffer[8];
-            teapotPacket[7] = fifoBuffer[9];
-            teapotPacket[8] = fifoBuffer[12];
-            teapotPacket[9] = fifoBuffer[13];
-            Serial.write(teapotPacket, 14);
-            teapotPacket[11]++; // packetCount, loops at 0xFF on purpose
-        #endif
-        //pc.printf("\n");
     }
 }
 
-void setMotors(float LSpd)
-{
-    // Need set period first then set pwm, it's a trap !!!
-    LSpd = LSpd * 4500;
-    //RSpd = RSpd * 3200.0;
-    unsigned int TmpL = abs((int)(1.0 / LSpd));   
-    //int TmpR = abs((int)(1.0 / RSpd));    
-    // SpdL_print = TmpL;
-/*    if (TmpL > -400 && TmpL < 0) {
-        TmpL = -400;
-    } else if (TmpL < 400 && TmpL >= 0) {
-        TmpL = 400;
-    } else if (TmpL >= 3125) {
-        TmpL = 3125;
-    } else if (TmpL <= -3125) {
-        TmpL = -3125;
-    }*/
-    TmpL = 1000000 * TmpL;
-     if (TmpL < 223 && TmpL >= 0) {
-        TmpL = 223;
-    } else if (TmpL >= 37650) {
-        TmpL = 37650;
-    } 
-    /*if (TmpR > -400 && TmpR < 0) {
-        TmpR = -400;
-    } else if (TmpR < 400 && TmpR >= 0) {
-        TmpR = 400;
-    } else if (TmpR >= 3125) {
-        TmpR = 3125;
-    } else if (TmpR <= -3125) {
-        TmpR = -3125;
-    }*/
-    //FREQ_CHECK.period_us(TmpL);
-    MOTOR_SPD_L.period_us(TmpL);
-    MOTOR_SPD_R.period_us(TmpL);
-
-    //FREQ_CHECK = 0.5;               // Set PWM Duty Cycle 50%
-    MOTOR_SPD_R = 0.5;          
-    MOTOR_SPD_L = 0.5;
-
-    if (LSpd >= 0.0) {
-        curr_dir = true;
-    } else {
-        curr_dir = false;
-    }
-
-    if (curr_dir != prev_dir) {
-    if(LSpd >= 0.0)  {    MOTOR_DIR_L = MOTOR_CW;  
-                          MOTOR_DIR_R = MOTOR_CW;
-                          prev_dir = true;
-    } else {
-                   MOTOR_DIR_L = MOTOR_CCW;  
-                   MOTOR_DIR_R = MOTOR_CCW;  
-                   prev_dir = false;
-    }
-    }
+void rise_handler() {
+    dmpReady = true;
 }
 
-void dosomething() {
-    //pc.printf("start....\r\n");
-    //ypr* tmp = (ypr*) malloc(sizeof(ypr) * 2);
-    //pc.printf("before copy....\r\n");
-    //buff.copyTo(tmp);
-    //pc.printf("rp  %7.4f %7.4f %7.2f %7.2f \t\n", tmp[0].roll, tmp[0].pitch, tmp[0].gyrox * 200, tmp[0].gyroy * 200);
-    float sensorRaw[4] = {0};
-    sensorRaw[0] = x_d.roll;
-    sensorRaw[1] = x_d.pitch;
-    sensorRaw[2] = x_d.gyrox * 200;
-    sensorRaw[3] = x_d.gyroy * 200; 
-    float nnCmd = nn(sensorRaw);
-    setMotors(nnCmd);
-//    free(tmp);
-
-    
-}
 int main() {
     setup();
     init();
     wait_ms(1000);
-//    buff.setCallBack(dosomething);
     t.start(callback(&queue, &EventQueue::dispatch_forever));
 
-    sw.rise(loop);
 
-    sw.fall(queue.event(dosomething));
+    sw.rise(rise_handler);
+    sw.fall(queue.event(loop));
             
     for (;;) {
-        //loop();
+//        printf("running...\r\n");
+        wait_ms(1);
     }
 
     return 0;
