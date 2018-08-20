@@ -243,11 +243,11 @@ void loop() {
    //         dosomething();
             //buff.append(x);
             float res = a_datax * a_datax + a_datay * a_datay + a_dataz * a_dataz;
- //           if (abs(a_datay) > 0.4) {
- //           timer.stop();
-            pc.printf("d:%7.5f \r\n", res);
- //           stop = true;
- //           }
+            if (abs(res) > 0.25 || abs(res) <= 0.24) {
+            timer.stop();
+            pc.printf("d:%7.5f t:%d \r\n", res, timer.read_us());
+            stop = true;
+            }
     }
 }
 
@@ -263,20 +263,19 @@ int main() {
 
 
             
+    MOTOR_En = true;
     printf("run......\r\n");
-    loop();
-//    setMotors(200);
-//    wait(10);
+    setMotors(3000);
+    wait(10);
     printf("run 0.1 for 10 s....\r\n");
-    //t.start(callback(&queue, &EventQueue::dispatch_forever));
-    //sw.rise(rise_handler);
-    //sw.fall(queue.event(loop));
+    t.start(callback(&queue, &EventQueue::dispatch_forever));
+    sw.rise(rise_handler);
+    sw.fall(queue.event(loop));
     printf("start....\r\n");
-    MOTOR_En = false;
- //   timer.start();
-//    setMotors(200);
+    timer.start();
+    setMotors(200);
     while (!stop) {
-        loop();
+//        loop();
     //pc.printf("goo....\r\n");
     }
     wait(5);
