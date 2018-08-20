@@ -232,9 +232,9 @@ void loop() {
             mpu.dmpGetGyro(data, fifoBuffer);
             int16_t acc[3];
             mpu.dmpGetAccel(acc, fifoBuffer);
-            float a_datax = (float)acc[0] / 16384.0f;
-            float a_datay = (float)acc[1] / 16384.0f;
-            float a_dataz = (float)acc[2] / 16384.0f;
+            float a_datax = abs((float)acc[0] / 16384.0f);
+            float a_datay = abs((float)acc[1] / 16384.0f);
+            float a_dataz = abs((float)acc[2] / 16384.0f);
             x_d.pitch = yprt[1];
             x_d.roll = yprt[2];
             x_d.gyrox = (float)data[0] / 16384.0f;
@@ -242,9 +242,10 @@ void loop() {
 //            pc.printf("d:%7.2f  b:%d \r\n", a_datax, timer.read_us());
    //         dosomething();
             //buff.append(x);
+            float res = a_datax * a_datax + a_datay * a_datay + a_dataz * a_dataz;
  //           if (abs(a_datay) > 0.4) {
  //           timer.stop();
-            pc.printf("d:%7.5f %7.5f %7.5f b:%d \r\n", a_datax, a_datay, a_dataz, timer.read_us());
+            pc.printf("d:%7.5f \r\n", res);
  //           stop = true;
  //           }
     }
@@ -264,7 +265,6 @@ int main() {
             
     printf("run......\r\n");
     loop();
-    MOTOR_En = false;
 //    setMotors(200);
 //    wait(10);
     printf("run 0.1 for 10 s....\r\n");
@@ -272,6 +272,7 @@ int main() {
     //sw.rise(rise_handler);
     //sw.fall(queue.event(loop));
     printf("start....\r\n");
+    MOTOR_En = false;
  //   timer.start();
 //    setMotors(200);
     while (!stop) {
