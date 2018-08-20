@@ -13,6 +13,7 @@
 // AD0 high = 0x69
 MPU6050 mpu;
 
+bool stop = false;
 // uncomment "OUTPUT_READABLE_QUATERNION" if you want to see the actual
 // quaternion components in a [w, x, y, z] format (not best for parsing
 // on a remote host such as Processing or something though)
@@ -93,15 +94,15 @@ DigitalOut MOTOR_DIR_L(MOROR_DIR_L_PIN);
 PwmOut MOTOR_SPD_R(MOTOR_SPD_R_PIN);
 PwmOut MOTOR_SPD_L(MOTOR_SPD_L_PIN);
 
-
+Timer timer;
 // ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
 
-void setMotors(float LSpd)
+void setMotors(unsigned int TmpL)
 {
     // Need set period first then set pwm, it's a trap !!!
-    LSpd = LSpd * 4500;
+    /*LSpd = LSpd * 4500;
     unsigned int TmpL = abs((int)(1.0 / LSpd));   
     TmpL = 1000000 * TmpL;
 
@@ -110,21 +111,21 @@ void setMotors(float LSpd)
     } else if (TmpL >= 37650) {
         TmpL = 37650;
     } 
-    //FREQ_CHECK.period_us(TmpL);
+    //FREQ_CHECK.period_us(TmpL);*/
     MOTOR_SPD_L.period_us(TmpL);
     MOTOR_SPD_R.period_us(TmpL);
 
     MOTOR_SPD_R = 0.5;          
     MOTOR_SPD_L = 0.5;
 
-    if(LSpd >= 0.0)  {    MOTOR_DIR_L = MOTOR_CW;  
+    /*if(LSpd >= 0.0)  {    MOTOR_DIR_L = MOTOR_CW;  
                           MOTOR_DIR_R = MOTOR_CW;
                           prev_dir = true;
     } else {
                    MOTOR_DIR_L = MOTOR_CCW;  
                    MOTOR_DIR_R = MOTOR_CCW;  
                    prev_dir = false;
-    }
+    }*/
 }
 void motorInit()
 {
@@ -142,7 +143,7 @@ void motorInit()
 
 void init() {
     motorInit();
-    MOTOR_En = true;
+    //MOTOR_En = true;
 }
 void setup() {
     // initialize device
@@ -189,6 +190,7 @@ void setup() {
 // ================================================================
 
 void dosomething() {
+    timer.start();
     float sensorRaw[4] = {0};
     sensorRaw[0] = x_d.roll;
     sensorRaw[1] = x_d.pitch;
@@ -200,6 +202,9 @@ void dosomething() {
     } else if (nnCmd < -0.3){
         nnCmd = -0.3f;
     }
+            timer.stop();
+            int res = timer.read_us();
+            pc.printf("%d ", res);
     setMotors(nnCmd);
 }
 
@@ -225,13 +230,23 @@ void loop() {
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
             mpu.dmpGetGyro(data, fifoBuffer);
+            int16_t acc[3];
+            mpu.dmpGetAccel(acc, fifoBuffer);
+            float a_datax = (float)acc[0] / 16384.0f;
+            float a_datay = (float)acc[1] / 16384.0f;
+            float a_dataz = (float)acc[2] / 16384.0f;
             x_d.pitch = yprt[1];
             x_d.roll = yprt[2];
             x_d.gyrox = (float)data[0] / 16384.0f;
             x_d.gyroy = (float)data[1] / 16384.0f;
-//            pc.printf("d %7.2f %7.2f %7.2f %7.2f   ", yprt[2], yprt[1], x_d.gyrox, x_d.gyroy);
-            dosomething();
+//            pc.printf("d:%7.2f  b:%d \r\n", a_datax, timer.read_us());
+   //         dosomething();
             //buff.append(x);
+ //           if (abs(a_datay) > 0.4) {
+ //           timer.stop();
+            pc.printf("d:%7.5f %7.5f %7.5f b:%d \r\n", a_datax, a_datay, a_dataz, timer.read_us());
+ //           stop = true;
+ //           }
     }
 }
 
@@ -240,19 +255,31 @@ void rise_handler() {
 }
 
 int main() {
+    stop = false;
     setup();
     init();
-    wait_ms(1000);
-    t.start(callback(&queue, &EventQueue::dispatch_forever));
 
 
-    sw.rise(rise_handler);
-    sw.fall(queue.event(loop));
+
             
-    for (;;) {
-//        printf("running...\r\n");
-        wait_ms(1);
+    printf("run......\r\n");
+    loop();
+    MOTOR_En = false;
+//    setMotors(200);
+//    wait(10);
+    printf("run 0.1 for 10 s....\r\n");
+    //t.start(callback(&queue, &EventQueue::dispatch_forever));
+    //sw.rise(rise_handler);
+    //sw.fall(queue.event(loop));
+    printf("start....\r\n");
+ //   timer.start();
+//    setMotors(200);
+    while (!stop) {
+        loop();
+    //pc.printf("goo....\r\n");
     }
+    wait(5);
+    MOTOR_En = false;
 
     return 0;
 }
