@@ -56,6 +56,7 @@ uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 const float maxspeed = 5.0;     // kHz
 unsigned int motorg = 0;
+float nnCmd = 0.0;
 
 InterruptIn sw(PE_15);
 EventQueue queue(32 * EVENTS_EVENT_SIZE);
@@ -106,8 +107,10 @@ PwmOut MOTOR_SPD_L(MOTOR_SPD_L_PIN);
 // ===                      INITIAL SETUP                       ===
 // ================================================================
 
-void setMotors(float LSpd)
+void setMotors()
+
 {
+    float LSpd = nnCmd;
     bool cw = true;
     // Need set period first then set pwm, it's a trap !!!
     if (LSpd >= 0.0) {
@@ -220,13 +223,12 @@ void dosomething() {
     sensorRaw[5] = nn_buf.pitch2; 
     sensorRaw[6] = nn_buf.roll3;
     sensorRaw[7] = nn_buf.pitch3; 
-    float nnCmd = nn(sensorRaw);
+    nnCmd = nn(sensorRaw);
 /*    if (nnCmd > 0.3) {
         nnCmd = 0.3f;
     } else if (nnCmd < -0.3){
         nnCmd = -0.3f;
     }*/
-    setMotors(nnCmd);
     nn_buf.roll3 = nn_buf.roll2;
     nn_buf.pitch3 = nn_buf.pitch2;
     nn_buf.roll2 = nn_buf.roll;
@@ -277,7 +279,8 @@ int main() {
 
     sw.rise(rise_handler);
     sw.fall(queue.event(loop));
-//    setMotors(0.1);
+    Ticker systick;
+    systick.attach(&setMotors, 1.0f/73);
             
     for (;;) {
 
