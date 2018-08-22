@@ -258,7 +258,7 @@ void loop() {
             mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
             mpu.dmpGetGyro(data, fifoBuffer);
             x_d.pitch = yprt[1];
-            x_d.roll = yprt[2];
+            x_d.roll = yprt[2] - 0.1;
             dosomething();
             //buff.append(x);
     }
@@ -282,7 +282,7 @@ int main() {
     for (;;) {
 
 //            pc.printf("motor: %d \r\n", motorg);
-            //pc.printf("roll: %7.2f, pitch: %7.2f \r\n", x_d.roll, x_d.pitch);
+//            pc.printf("roll: %7.2f, pitch: %7.2f \r\n", x_d.roll, x_d.pitch);
         wait_ms(2);
     }
 
