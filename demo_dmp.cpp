@@ -73,10 +73,17 @@ int16_t data[3];
 struct ypr {
     float roll;
     float pitch;
-    float gyrox;
-    float gyroy;
+};
+struct nn_input {
+    float roll;
+    float pitch;
+    float roll2;
+    float pitch2;
+    float roll3;
+    float pitch3;
 };
 ypr x_d;
+nn_input nn_buf;
 #define MOTOR_EN_PIN        PF_12   // D8
 #define MOTOR_SPD_R_PIN     PD_14   // D10
 #define MOTOR_SPD_L_PIN     PD_15   // D9
@@ -152,6 +159,12 @@ void motorInit()
 void init() {
     motorInit();
     MOTOR_En = true;
+    nn_buf.roll = 0.0;
+    nn_buf.pitch = 0.0;
+    nn_buf.roll2 = 0.0;
+    nn_buf.pitch2 = 0.0;
+    nn_buf.roll3 = 0.0;
+    nn_buf.pitch3 = 0.0;
 }
 void setup() {
     // initialize device
@@ -198,11 +211,15 @@ void setup() {
 // ================================================================
 
 void dosomething() {
-    float sensorRaw[4] = {0};
+    float sensorRaw[8] = {0.0};
     sensorRaw[0] = x_d.roll;
     sensorRaw[1] = x_d.pitch;
-    sensorRaw[2] = x_d.gyrox * 200;
-    sensorRaw[3] = x_d.gyroy * 200; 
+    sensorRaw[2] = nn_buf.roll;
+    sensorRaw[3] = nn_buf.pitch; 
+    sensorRaw[4] = nn_buf.roll2;
+    sensorRaw[5] = nn_buf.pitch2; 
+    sensorRaw[6] = nn_buf.roll3;
+    sensorRaw[7] = nn_buf.pitch3; 
     float nnCmd = nn(sensorRaw);
 /*    if (nnCmd > 0.3) {
         nnCmd = 0.3f;
@@ -210,6 +227,12 @@ void dosomething() {
         nnCmd = -0.3f;
     }*/
     setMotors(nnCmd);
+    nn_buf.roll3 = nn_buf.roll2;
+    nn_buf.pitch3 = nn_buf.pitch2;
+    nn_buf.roll2 = nn_buf.roll;
+    nn_buf.pitch2 = nn_buf.pitch;
+    nn_buf.roll = x_d.roll;
+    nn_buf.pitch = x_d.pitch;
 }
 
 void loop() {
@@ -236,8 +259,6 @@ void loop() {
             mpu.dmpGetGyro(data, fifoBuffer);
             x_d.pitch = yprt[1];
             x_d.roll = yprt[2];
-            x_d.gyrox = (float)data[0] / 16384.0f;
-            x_d.gyroy = (float)data[1] / 16384.0f;
             dosomething();
             //buff.append(x);
     }
