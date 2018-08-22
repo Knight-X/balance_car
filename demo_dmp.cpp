@@ -55,6 +55,7 @@ uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 const float maxspeed = 5.0;     // kHz
+unsigned int motorg = 0;
 
 InterruptIn sw(PE_15);
 EventQueue queue(32 * EVENTS_EVENT_SIZE);
@@ -100,10 +101,18 @@ PwmOut MOTOR_SPD_L(MOTOR_SPD_L_PIN);
 
 void setMotors(float LSpd)
 {
+    bool cw = true;
     // Need set period first then set pwm, it's a trap !!!
+    if (LSpd >= 0.0) {
+        cw = true;
+    } else {
+        cw = false;
+    }
     LSpd = LSpd * 4500;
-    unsigned int TmpL = abs((int)(1.0 / LSpd));   
-    TmpL = 1000000 * TmpL;
+    LSpd = abs(1.0 / LSpd);   
+    LSpd = 1000000 * LSpd;
+    unsigned int TmpL = (unsigned int)LSpd;   
+    motorg = TmpL;
 
      if (TmpL < 223 && TmpL >= 0) {
         TmpL = 223;
@@ -117,7 +126,7 @@ void setMotors(float LSpd)
     MOTOR_SPD_R = 0.5;          
     MOTOR_SPD_L = 0.5;
 
-    if(LSpd >= 0.0)  {    MOTOR_DIR_L = MOTOR_CW;  
+    if(cw)  {    MOTOR_DIR_L = MOTOR_CW;  
                           MOTOR_DIR_R = MOTOR_CW;
                           prev_dir = true;
     } else {
@@ -192,14 +201,14 @@ void dosomething() {
     float sensorRaw[4] = {0};
     sensorRaw[0] = x_d.roll;
     sensorRaw[1] = x_d.pitch;
-    sensorRaw[2] = x_d.gyrox * 250;
-    sensorRaw[3] = x_d.gyroy * 250; 
+    sensorRaw[2] = x_d.gyrox * 200;
+    sensorRaw[3] = x_d.gyroy * 200; 
     float nnCmd = nn(sensorRaw);
-    if (nnCmd > 0.3) {
+/*    if (nnCmd > 0.3) {
         nnCmd = 0.3f;
     } else if (nnCmd < -0.3){
         nnCmd = -0.3f;
-    }
+    }*/
     setMotors(nnCmd);
 }
 
@@ -229,7 +238,6 @@ void loop() {
             x_d.roll = yprt[2];
             x_d.gyrox = (float)data[0] / 16384.0f;
             x_d.gyroy = (float)data[1] / 16384.0f;
-//            pc.printf("d %7.2f %7.2f %7.2f %7.2f   ", yprt[2], yprt[1], x_d.gyrox, x_d.gyroy);
             dosomething();
             //buff.append(x);
     }
@@ -248,10 +256,13 @@ int main() {
 
     sw.rise(rise_handler);
     sw.fall(queue.event(loop));
+//    setMotors(0.1);
             
     for (;;) {
-//        printf("running...\r\n");
-        wait_ms(1);
+
+//            pc.printf("motor: %d \r\n", motorg);
+            //pc.printf("roll: %7.2f, pitch: %7.2f \r\n", x_d.roll, x_d.pitch);
+        wait_ms(2);
     }
 
     return 0;
