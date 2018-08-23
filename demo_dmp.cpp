@@ -258,7 +258,7 @@ void loop() {
             mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
             mpu.dmpGetGyro(data, fifoBuffer);
             x_d.pitch = yprt[1];
-            x_d.roll = yprt[2] - 0.1;
+            x_d.roll = yprt[2] - 0.08;
             dosomething();
             //buff.append(x);
     }
