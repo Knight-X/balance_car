@@ -56,11 +56,12 @@ uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 const float maxspeed = 5.0;     // kHz
 unsigned int motorg = 0;
-float nnCmd = 0.0;
 
 InterruptIn sw(PE_15);
 EventQueue queue(32 * EVENTS_EVENT_SIZE);
+EventQueue pqueue(8 * EVENTS_EVENT_SIZE);
 Thread t;
+Thread p;
 Serial pc(USBTX, USBRX, 115200);
 // orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
@@ -107,10 +108,8 @@ PwmOut MOTOR_SPD_L(MOTOR_SPD_L_PIN);
 // ===                      INITIAL SETUP                       ===
 // ================================================================
 
-void setMotors()
-
+void setMotors(float LSpd)
 {
-    float LSpd = nnCmd;
     bool cw = true;
     // Need set period first then set pwm, it's a trap !!!
     if (LSpd >= 0.0) {
@@ -223,12 +222,13 @@ void dosomething() {
     sensorRaw[5] = nn_buf.pitch2; 
     sensorRaw[6] = nn_buf.roll3;
     sensorRaw[7] = nn_buf.pitch3; 
-    nnCmd = nn(sensorRaw);
+    float nnCmd = nn(sensorRaw);
 /*    if (nnCmd > 0.3) {
         nnCmd = 0.3f;
     } else if (nnCmd < -0.3){
         nnCmd = -0.3f;
     }*/
+    setMotors(nnCmd);
     nn_buf.roll3 = nn_buf.roll2;
     nn_buf.pitch3 = nn_buf.pitch2;
     nn_buf.roll2 = nn_buf.roll;
@@ -270,19 +270,25 @@ void rise_handler() {
     dmpReady = true;
 }
 
+void status() {
+     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, motorg);
+}
+
 int main() {
     setup();
     init();
     wait_ms(1000);
     t.start(callback(&queue, &EventQueue::dispatch_forever));
+    p.start(callback(&pqueue, &EventQueue::dispatch_forever));
+    p.set_priority(osPriorityLow);
+
 
 
     sw.rise(rise_handler);
     sw.fall(queue.event(loop));
-    Ticker systick;
-    systick.attach(&setMotors, 1.0f/73);
             
     for (;;) {
+        pqueue.call(status);
 
 //            pc.printf("motor: %d \r\n", motorg);
 //            pc.printf("roll: %7.2f, pitch: %7.2f \r\n", x_d.roll, x_d.pitch);
