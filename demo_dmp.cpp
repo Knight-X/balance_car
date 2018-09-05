@@ -13,6 +13,9 @@
 // AD0 high = 0x69
 MPU6050 mpu;
 
+bool start;
+bool terminal;
+int steps;
 // uncomment "OUTPUT_READABLE_QUATERNION" if you want to see the actual
 // quaternion components in a [w, x, y, z] format (not best for parsing
 // on a remote host such as Processing or something though)
@@ -58,6 +61,7 @@ const float maxspeed = 5.0;     // kHz
 unsigned int motorg = 0;
 
 InterruptIn sw(PE_15);
+InterruptIn interrupt_button(PC_13);
 EventQueue queue(32 * EVENTS_EVENT_SIZE);
 EventQueue pqueue(8 * EVENTS_EVENT_SIZE);
 Thread t;
@@ -159,6 +163,9 @@ void motorInit()
 }
 
 void init() {
+    start = false;
+    terminal = false;
+    steps = 0;
     motorInit();
     MOTOR_En = true;
     nn_buf.roll = 0.0;
@@ -251,18 +258,31 @@ void loop() {
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
     } else if (fifoCount >= 42) {
         // read a packet from FIFO
+//        int start_time = ss.read_ms();
+//        ss.start();
         mpu.getFIFOBytes(fifoBuffer, packetSize);
         
 
             // display Euler angles in degrees
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
-            mpu.dmpGetGyro(data, fifoBuffer);
-            x_d.pitch = yprt[1];
-            x_d.roll = yprt[2] - 0.08;
-            dosomething();
+            if (!terminal) {
+              mpu.dmpGetQuaternion(&q, fifoBuffer);
+              mpu.dmpGetGravity(&gravity, &q);
+              mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
+              mpu.dmpGetGyro(data, fifoBuffer);
+              x_d.pitch = yprt[1];
+              x_d.roll = yprt[2] - 0.08;
+              dosomething();
+              if (start) {
+                steps = steps + 1;
+              }
             //buff.append(x);
+//            ss.stop();
+//            printf(" %d \r\n", ss.read_ms() - start_time);
+              if (abs(x_d.roll) > 0.3925 || abs(x_d.pitch) > 0.3925) {
+                terminal = true;
+                start = false;
+              }
+            }
     }
 }
 
@@ -271,13 +291,23 @@ void rise_handler() {
 }
 
 void status() {
-     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, motorg);
+//    if (start) {
+//     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, motorg);
+//    }
+  if (terminal) {
+     pc.printf("motor: %d\r\n", steps);
+    
+  }
 }
 
+void start_timing() {
+    start = true;
+}
 int main() {
     setup();
     init();
     wait_ms(1000);
+    interrupt_button.fall(&start_timing);
     t.start(callback(&queue, &EventQueue::dispatch_forever));
     p.start(callback(&pqueue, &EventQueue::dispatch_forever));
     p.set_priority(osPriorityLow);
