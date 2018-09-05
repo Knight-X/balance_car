@@ -270,7 +270,7 @@ void loop() {
               mpu.dmpGetYawPitchRoll(yprt, &q, &gravity);
               mpu.dmpGetGyro(data, fifoBuffer);
               x_d.pitch = yprt[1];
-              x_d.roll = yprt[2] - 0.08;
+              x_d.roll = yprt[2];
               dosomething();
               if (start) {
                 steps = steps + 1;
@@ -278,7 +278,7 @@ void loop() {
             //buff.append(x);
 //            ss.stop();
 //            printf(" %d \r\n", ss.read_ms() - start_time);
-              if (abs(x_d.roll) > 0.3925 || abs(x_d.pitch) > 0.3925) {
+              if (start && (abs(x_d.roll) > 0.3925 || abs(x_d.pitch) > 0.3925)) {
                 terminal = true;
                 start = false;
               }
