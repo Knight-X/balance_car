@@ -291,13 +291,16 @@ void rise_handler() {
 }
 
 void status() {
-//    if (start) {
-//     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, motorg);
-//    }
+#ifdef _COLLECT_DATA
+    if (start) {
+     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, motorg);
+    }
+#else 
   if (terminal) {
      pc.printf("motor: %d\r\n", steps);
     
   }
+#endif
 }
 
 void start_timing() {
