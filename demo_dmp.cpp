@@ -83,10 +83,10 @@ struct ypr {
 struct nn_input {
     float roll;
     float pitch;
+    float motor;
     float roll2;
     float pitch2;
-    float roll3;
-    float pitch3;
+    float motor2;
 };
 ypr x_d;
 nn_input nn_buf;
@@ -170,10 +170,10 @@ void init() {
     MOTOR_En = true;
     nn_buf.roll = 0.0;
     nn_buf.pitch = 0.0;
+    nn_buf.motor = 0.0;
     nn_buf.roll2 = 0.0;
     nn_buf.pitch2 = 0.0;
-    nn_buf.roll3 = 0.0;
-    nn_buf.pitch3 = 0.0;
+    nn_buf.motor2 = 0.0;
 }
 void setup() {
     // initialize device
@@ -221,14 +221,17 @@ void setup() {
 
 void dosomething() {
     float sensorRaw[8] = {0.0};
+    x_d.roll = x_d.roll / 1.5707963;
+    x_d.pitch = x_d.pitch / 1.5707963;
     sensorRaw[0] = x_d.roll;
     sensorRaw[1] = x_d.pitch;
-    sensorRaw[2] = nn_buf.roll;
-    sensorRaw[3] = nn_buf.pitch; 
-    sensorRaw[4] = nn_buf.roll2;
-    sensorRaw[5] = nn_buf.pitch2; 
-    sensorRaw[6] = nn_buf.roll3;
-    sensorRaw[7] = nn_buf.pitch3; 
+    sensorRaw[2] = nn_buf.roll2;
+    sensorRaw[3] = nn_buf.pitch2; 
+    sensorRaw[4] = nn_buf.motor;
+    sensorRaw[5] = nn_buf.motor; 
+    sensorRaw[6] = nn_buf.motor2;
+    sensorRaw[7] = nn_buf.motor2; 
+
     float nnCmd = nn(sensorRaw);
 /*    if (nnCmd > 0.3) {
         nnCmd = 0.3f;
@@ -236,10 +239,10 @@ void dosomething() {
         nnCmd = -0.3f;
     }*/
     setMotors(nnCmd);
-    nn_buf.roll3 = nn_buf.roll2;
-    nn_buf.pitch3 = nn_buf.pitch2;
+    nn_buf.motor2 = nn_buf.motor;
     nn_buf.roll2 = nn_buf.roll;
     nn_buf.pitch2 = nn_buf.pitch;
+    nn_buf.motor = nnCmd;
     nn_buf.roll = x_d.roll;
     nn_buf.pitch = x_d.pitch;
 }
@@ -289,18 +292,18 @@ void loop() {
 void rise_handler() {
     dmpReady = true;
 }
-
+//#define COLLECT_DATA
 void status() {
-#ifdef _COLLECT_DATA
-    if (start) {
+//#ifdef _COLLECT_DATA
+//    if (start) {
      pc.printf("roll: %7.2f, pitch: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, motorg);
-    }
-#else 
-  if (terminal) {
-     pc.printf("motor: %d\r\n", steps);
+//   }
+//#else 
+//  if (terminal) {
+//     pc.printf("motor: %d\r\n", steps);
     
-  }
-#endif
+//  }
+//#endif
 }
 
 void start_timing() {
