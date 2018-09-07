@@ -226,11 +226,11 @@ void setup() {
 
 void dosomething() {
     float sensorRaw[12] = {0.0};
-    float correct_roll = x_d.roll - 0.08;
-    correct_roll = correct_roll / 1.5707963;
+    x_d.roll = x_d.roll - 0.08;
+    x_d.roll = x_d.roll / 1.5707963;
     x_d.pitch = x_d.pitch / 1.5707963;
     float acctmp = nn_buf.motor - nn_buf.motor2;
-    sensorRaw[0] = correct_roll;
+    sensorRaw[0] = x_d.roll;
     sensorRaw[1] = x_d.pitch;
     sensorRaw[2] = nn_buf.roll2;
     sensorRaw[3] = nn_buf.pitch2; 
@@ -251,7 +251,7 @@ void dosomething() {
     nn_buf.pitch2 = nn_buf.pitch;
     nn_buf.acc = acctmp;
     nn_buf.motor = nnCmd;
-    nn_buf.roll = correct_roll;
+    nn_buf.roll = x_d.roll;
     nn_buf.pitch = x_d.pitch;
 }
 
@@ -301,22 +301,17 @@ void rise_handler() {
     dmpReady = true;
 }
 void status() {
-#ifdef _COLLECT_DATA
     if (start) {
-     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, motorg);
-   } else {
+     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, nn: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, nn_buf.motor, motorg);
+   } else if (terminal) {
+     pc.printf("steps: %d\r\n", steps);
+  } else {
        pc.printf("not started yet....\r\n");
    }
-#else 
-  if (terminal) {
-     pc.printf("motor: %d\r\n", steps);
-    
-  }
-#endif
 }
 
 void start_timing() {
-    start = true;
+      start = true;
 }
 int main() {
     setup();
@@ -338,6 +333,9 @@ int main() {
 //            pc.printf("motor: %d \r\n", motorg);
 //            pc.printf("roll: %7.2f, pitch: %7.2f \r\n", x_d.roll, x_d.pitch);
         wait_ms(2);
+        if (terminal) {
+            break;
+        }
     }
 
     return 0;
