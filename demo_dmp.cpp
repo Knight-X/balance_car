@@ -293,22 +293,18 @@ void loop() {
 void rise_handler() {
     dmpReady = true;
 }
-//#define COLLECT_DATA
 void status() {
-//#ifdef _COLLECT_DATA
-//    if (start) {
-     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, motorg);
-//   }
-//#else 
-//  if (terminal) {
-//     pc.printf("motor: %d\r\n", steps);
-    
-//  }
-//#endif
+    if (start) {
+     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, nn: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, nn_buf.motor, motorg);
+   } else if (terminal) {
+     pc.printf("steps: %d\r\n", steps);
+  } else {
+       pc.printf("not started yet....\r\n");
+   }
 }
 
 void start_timing() {
-    start = true;
+      start = true;
 }
 int main() {
     setup();
@@ -330,6 +326,9 @@ int main() {
 //            pc.printf("motor: %d \r\n", motorg);
 //            pc.printf("roll: %7.2f, pitch: %7.2f \r\n", x_d.roll, x_d.pitch);
         wait_ms(2);
+        if (terminal) {
+            break;
+        }
     }
 
     return 0;
