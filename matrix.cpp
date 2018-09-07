@@ -11,8 +11,8 @@ float tanha(float src) {
 void fully1(float* a, float* res) {
   for (int i = 0; i < 64; i++) {
          float tmp = 0.0;
-      for (int j = 0; j < 8; j++) {
-          tmp = tmp + (w1[i * 8 + j] * a[j]);
+      for (int j = 0; j < 12; j++) {
+          tmp = tmp + (w1[i * 12 + j] * a[j]);
       }
       res[i] = tmp + b1[i];
   }

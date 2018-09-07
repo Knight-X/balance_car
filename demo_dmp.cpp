@@ -84,9 +84,11 @@ struct nn_input {
     float roll;
     float pitch;
     float motor;
+    float acc;
     float roll2;
     float pitch2;
     float motor2;
+    float acc2;
 };
 ypr x_d;
 nn_input nn_buf;
@@ -174,6 +176,8 @@ void init() {
     nn_buf.roll2 = 0.0;
     nn_buf.pitch2 = 0.0;
     nn_buf.motor2 = 0.0;
+    nn_buf.acc = 0.0;
+    nn_buf.acc2 = 0.0;
 }
 void setup() {
     // initialize device
@@ -220,9 +224,10 @@ void setup() {
 // ================================================================
 
 void dosomething() {
-    float sensorRaw[8] = {0.0};
+    float sensorRaw[12] = {0.0};
     x_d.roll = x_d.roll / 1.5707963;
     x_d.pitch = x_d.pitch / 1.5707963;
+    float acctmp = nn_buf.motor - nn_buf.motor2;
     sensorRaw[0] = x_d.roll;
     sensorRaw[1] = x_d.pitch;
     sensorRaw[2] = nn_buf.roll2;
@@ -231,6 +236,10 @@ void dosomething() {
     sensorRaw[5] = nn_buf.motor; 
     sensorRaw[6] = nn_buf.motor2;
     sensorRaw[7] = nn_buf.motor2; 
+    sensorRaw[8] = acctmp;
+    sensorRaw[9] = acctmp;
+    sensorRaw[10] = nn_buf.acc;
+    sensorRaw[11] = nn_buf.acc; 
 
     float nnCmd = nn(sensorRaw);
 /*    if (nnCmd > 0.3) {
@@ -239,9 +248,11 @@ void dosomething() {
         nnCmd = -0.3f;
     }*/
     setMotors(nnCmd);
+    nn_buf.acc2 = nn_buf.acc;
     nn_buf.motor2 = nn_buf.motor;
     nn_buf.roll2 = nn_buf.roll;
     nn_buf.pitch2 = nn_buf.pitch;
+    nn_buf.acc = acctmp;
     nn_buf.motor = nnCmd;
     nn_buf.roll = x_d.roll;
     nn_buf.pitch = x_d.pitch;
