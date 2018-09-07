@@ -221,6 +221,7 @@ void setup() {
 
 void dosomething() {
     float sensorRaw[8] = {0.0};
+    x_d.roll = x_d.roll - 0.08;
     x_d.roll = x_d.roll / 1.5707963;
     x_d.pitch = x_d.pitch / 1.5707963;
     sensorRaw[0] = x_d.roll;
