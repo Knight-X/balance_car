@@ -6,6 +6,7 @@
 #include "mbed.h"
 #include "ppo-test.hpp"
 
+#define _COLLECT_DATA 3
 
 // class default I2C address is 0x68
 // specific I2C addresses may be passed as a parameter here
@@ -16,7 +17,6 @@ MPU6050 mpu;
 bool start;
 bool terminal;
 int steps;
-float bias;
 // uncomment "OUTPUT_READABLE_QUATERNION" if you want to see the actual
 // quaternion components in a [w, x, y, z] format (not best for parsing
 // on a remote host such as Processing or something though)
@@ -169,7 +169,6 @@ void init() {
     start = false;
     terminal = false;
     steps = 0;
-    bias = 0.0;
     motorInit();
     MOTOR_En = true;
     nn_buf.roll = 0.0;
@@ -245,9 +244,6 @@ void dosomething() {
     sensorRaw[11] = nn_buf.acc; 
 
     float nnCmd = nn(sensorRaw);
-    if (nnCmd <= 0.001 && nnCmd >= -0.001) {
-        bias = x_d.roll;
-    } 
     setMotors(nnCmd);
     nn_buf.acc2 = nn_buf.acc;
     nn_buf.motor2 = nn_buf.motor;
@@ -304,18 +300,19 @@ void loop() {
 void rise_handler() {
     dmpReady = true;
 }
-//#define COLLECT_DATA
 void status() {
-//#ifdef _COLLECT_DATA
-//    if (start) {
+#ifdef _COLLECT_DATA
+    if (start) {
      pc.printf("roll: %7.2f, pitch: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, motorg);
-//   }
-//#else 
-//  if (terminal) {
-//     pc.printf("motor: %d\r\n", steps);
+   } else {
+       pc.printf("not started yet....\r\n");
+   }
+#else 
+  if (terminal) {
+     pc.printf("motor: %d\r\n", steps);
     
-//  }
-//#endif
+  }
+#endif
 }
 
 void start_timing() {
