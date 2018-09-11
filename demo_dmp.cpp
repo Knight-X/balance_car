@@ -90,6 +90,9 @@ struct nn_input {
     float pitch2;
     float motor2;
     float acc2;
+    float roll3;
+    float pitch3;
+    float motor3;
 };
 ypr x_d;
 nn_input nn_buf;
@@ -179,6 +182,9 @@ void init() {
     nn_buf.motor2 = 0.0;
     nn_buf.acc = 0.0;
     nn_buf.acc2 = 0.0;
+    nn_buf.motor3 = 0.0;
+    nn_buf.roll3 = 0.0;
+    nn_buf.pitch3 = 0.0;
 }
 void setup() {
     // initialize device
@@ -224,6 +230,7 @@ void setup() {
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 
+void status(nn_input);
 void dosomething() {
     float sensorRaw[12] = {0.0};
     x_d.roll = x_d.roll - 0.08;
@@ -245,6 +252,9 @@ void dosomething() {
 
     float nnCmd = nn(sensorRaw);
     setMotors(nnCmd);
+    nn_buf.motor3 = nn_buf.motor2;
+    nn_buf.roll3 = nn_buf.roll2;
+    nn_buf.pitch3 = nn_buf.pitch2;
     nn_buf.acc2 = nn_buf.acc;
     nn_buf.motor2 = nn_buf.motor;
     nn_buf.roll2 = nn_buf.roll;
@@ -253,6 +263,7 @@ void dosomething() {
     nn_buf.motor = nnCmd;
     nn_buf.roll = x_d.roll;
     nn_buf.pitch = x_d.pitch;
+    pqueue.call(status, nn_buf);
 }
 
 void loop() {
@@ -300,9 +311,9 @@ void loop() {
 void rise_handler() {
     dmpReady = true;
 }
-void status() {
+void status(nn_input b) {
     if (start) {
-     pc.printf("roll: %7.2f, pitch: %7.2f \r\n, nn: %7.2f \r\n, motor: %d\r\n", x_d.roll, x_d.pitch, nn_buf.motor, motorg);
+     pc.printf("roll: %7.2f, pitch: %7.2f , nn: %7.2f, roll2: %7.2f, pitch2: %7.2f, nn2: %7.2f, roll3: %7.2f, pitch3: %7.2f, nn3: %7.2f \r\n", b.roll, b.pitch, b.motor, b.roll2, b.pitch2, b.motor2, b.roll3, b.pitch3, b.motor3);
    } else if (terminal) {
      pc.printf("steps: %d\r\n", steps);
   } else {
@@ -328,7 +339,6 @@ int main() {
     sw.fall(queue.event(loop));
             
     for (;;) {
-        pqueue.call(status);
 
 //            pc.printf("motor: %d \r\n", motorg);
 //            pc.printf("roll: %7.2f, pitch: %7.2f \r\n", x_d.roll, x_d.pitch);
