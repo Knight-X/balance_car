@@ -42,3 +42,21 @@ float nn(float* input) {
 
     return res;
 }
+
+float fully3(float a) {
+  float res3 = a * w3 + b3;
+  return res3;
+}
+
+float logs(float a) {
+  float res4 = a * w4 + logs;
+  res4 = exp(res4);
+  return res4;
+}
+
+
+float act(float exp, float b) {
+  float rand = rand();
+  float res = rand * exp + b;
+  return res;
+}
